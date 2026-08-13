@@ -17,11 +17,12 @@ else
 fi
 NODE_PID=$!
 
+# Standard health probe (all apps): GET /api/v1/health
 healthy=0
 for _ in $(seq 1 40); do
   if node -e "fetch('http://127.0.0.1:${BACKEND_HTTP_PORT}/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" \
       2>/dev/null; then
-    echo "[zephyr] backend healthy"
+    echo "[zephyr] backend healthy (/api/v1/health)"
     healthy=1
     break
   fi

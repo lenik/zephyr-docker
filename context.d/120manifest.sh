@@ -26,11 +26,13 @@ test -f "$CTX/app/package.json"
 test -f "$CTX/app/pnpm-lock.yaml"
 test -f "$CTX/app/node_modules/fastify/package.json" || die "app/node_modules not packaged"
 test -f "$CTX/app/backend/dist/server.js"
-test -f "$CTX/app/prisma/seed.ts"
-test -f "$CTX/app/prisma/src/createId.ts"
-test -f "$CTX/app/prisma/systemParamDefaults.ts"
-test -f "$CTX/app/prisma/loadCatsDoc.ts"
-test -f "$CTX/app/prisma/seedGeography.ts"
+test -f "$CTX/app/prisma/schema.prisma"
+test -d "$CTX/app/prisma/migrations"
+# seed is optional at the packaging layer; migrate still requires schema + migrations
+if [[ -f "$REPO/prisma/seed.ts" || -f "$REPO/prisma/seed.mjs" || -f "$REPO/prisma/seed.cjs" ]]; then
+  [[ -f "$CTX/app/prisma/seed.ts" || -f "$CTX/app/prisma/seed.mjs" || -f "$CTX/app/prisma/seed.cjs" ]] \
+    || die "prisma seed missing after copy"
+fi
 test -f "$CTX/app/prisma-generated/libquery_engine-rhel-openssl-3.0.x.so.node"
 test -f "$CTX/features.env"
 test -f "$CTX/mobile-www/index.html"

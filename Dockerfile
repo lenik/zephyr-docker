@@ -48,15 +48,19 @@ COPY zephyr-pg-backup /usr/local/bin/zephyr-pg-backup
 WORKDIR /app
 
 # Host-copied node_modules keep a host pnpm storeDir; do not `pnpm rebuild`.
-# argon2 ships linux glibc prebuilds — just verify require() works.
+# Optional natives (argon2) are verified only when present in the dep graph.
 RUN chmod +x /entrypoint.sh /usr/local/bin/zephyr-pg-backup \
     && chown -R node:node /app /opt/zephyr-e2e \
     && export PRISMA_CLI_BINARY_TARGETS=rhel-openssl-3.0.x \
     && printf '%s\n' "store-dir=/var/cache/pnpm/store" > /app/.npmrc \
     && chown node:node /app/.npmrc \
-    && echo "zephyr: verify argon2 (prebuilt .node; no pnpm rebuild — host store path mismatch)" \
-    && runuser -u node -- env HOME=/home/node \
-         bash -lc 'node -e "require(\"argon2\")"' \
+    && if [ -f node_modules/argon2/package.json ]; then \
+         echo "zephyr: verify argon2 (prebuilt .node; no pnpm rebuild — host store path mismatch)" \
+         && runuser -u node -- env HOME=/home/node \
+              bash -lc 'node -e "require(\"argon2\")"'; \
+       else \
+         echo "zephyr: argon2 not in image deps (skipped)"; \
+       fi \
     && if [ -f /opt/zephyr-e2e/package.json ]; then \
          dnf install -y --setopt=install_weak_deps=False \
            alsa-lib atk at-spi2-atk cairo cups-libs dbus-libs \
@@ -81,9 +85,7 @@ RUN chmod +x /entrypoint.sh /usr/local/bin/zephyr-pg-backup \
        else \
          echo "zephyr: e2e module omitted in this image"; \
        fi \
-    && test -f node_modules/fastify/package.json \
-    && test -f node_modules/argon2/package.json \
-    && test -f node_modules/decimal.js/package.json
+    && test -f node_modules/fastify/package.json
 
 # --- app payload (changes often; does not re-copy node_modules) ---
 COPY app/backend /app/backend
@@ -104,7 +106,8 @@ RUN mkdir -p node_modules/.prisma \
     && chown -R node:node /app /opt/zephyr-e2e /opt/ms-playwright /var/cache/pnpm /opt/minimal \
     && test -f node_modules/.prisma/client/libquery_engine-rhel-openssl-3.0.x.so.node \
     && test -f node_modules/.pnpm/@prisma+client@*/node_modules/.prisma/client/index.js \
-    && test -f /app/prisma/src/createId.ts \
+    && test -f /app/prisma/schema.prisma \
+    && test -f /app/backend/dist/server.js \
     && rm -f /tmp/zephyr-features.env
 
 ENV PGDATA=/var/lib/pgsql/data/pgdata \

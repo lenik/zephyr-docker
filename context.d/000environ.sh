@@ -41,11 +41,8 @@ ensure_host_build() {
   [[ -d "$dist" ]] || die "$dist missing after build"
 }
 
-# Non-interactive make/SSH often has system Node but no nvm/pnpm on PATH.
+# Always prefer nvm *stable* (local Node + pnpm cache). Avoid system Node.
 ensure_host_pnpm() {
-  if command -v pnpm >/dev/null 2>&1 && pnpm --version >/dev/null 2>&1; then
-    return 0
-  fi
   local nvm_sh candidate
   for candidate in "${NVM_DIR:-}" "$HOME/.nvm" /usr/local/nvm; do
     [[ -n "$candidate" && -s "$candidate/nvm.sh" ]] || continue
@@ -57,18 +54,22 @@ ensure_host_pnpm() {
     export NVM_DIR="$(cd "$(dirname "$nvm_sh")" && pwd)"
     # shellcheck disable=SC1091
     . "$nvm_sh"
-    nvm use default >/dev/null 2>&1 || nvm use node >/dev/null 2>&1 || true
+    # Prefer stable; fall back to default / node / current.
+    nvm use stable >/dev/null 2>&1 \
+      || nvm use default >/dev/null 2>&1 \
+      || nvm use node >/dev/null 2>&1 \
+      || true
   fi
-  if command -v pnpm >/dev/null 2>&1 && pnpm --version >/dev/null 2>&1; then
+  if command -v pnpm >/dev/null 2>&1 && pnpm --version >/dev/null 2>&1 \
+     && command -v node >/dev/null 2>&1; then
     echo "using host pnpm=$(command -v pnpm) node=$(command -v node) ($(node -v))"
     return 0
   fi
-  die "pnpm not found on host (load nvm or put Node >= 22 + pnpm on PATH)"
+  die "pnpm/node not found — install nvm stable (Node >= 22) + pnpm"
 }
 
 export -f latest_mtime dist_outdated ensure_host_build ensure_host_pnpm
 
-command -v node >/dev/null || die "node not found on host"
 ensure_host_pnpm
 [[ -e "$REPO/backend/changelog/zh_CN" ]] || die "missing backend/changelog/zh_CN"
 

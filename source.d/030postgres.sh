@@ -66,16 +66,21 @@ if [[ ! -f "$PGDATA/.zephyr_bootstrapped" ]]; then
       WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '${POSTGRES_DB}')\gexec
     GRANT ALL PRIVILEGES ON DATABASE ${POSTGRES_DB} TO ${POSTGRES_USER};
 EOSQL
+  # PostGIS is optional (some apps); skip quietly when unavailable.
   run_pg env PGUSER=postgres PGDATABASE="$POSTGRES_DB" \
-    psql -p "$PGPORT" -v ON_ERROR_STOP=1 --username=postgres --dbname="$POSTGRES_DB" \
-    -c 'CREATE EXTENSION IF NOT EXISTS postgis;'
+    psql -p "$PGPORT" \
+        --username=postgres \
+        --dbname="$POSTGRES_DB" \
+        -c 'CREATE EXTENSION IF NOT EXISTS postgis;' >/dev/null 2>&1 \
+    || echo "[zephyr] postgis extension skipped (not available)"
   touch "$PGDATA/.zephyr_bootstrapped"
   chown postgres:postgres "$PGDATA/.zephyr_bootstrapped"
 fi
 
 run_pg env PGUSER=postgres PGDATABASE="$POSTGRES_DB" \
-  psql -p "$PGPORT" -v ON_ERROR_STOP=1 --username=postgres --dbname="$POSTGRES_DB" \
-  -c 'CREATE EXTENSION IF NOT EXISTS postgis;' >/dev/null
+  psql -p "$PGPORT" --username=postgres --dbname="$POSTGRES_DB" \
+  -c 'CREATE EXTENSION IF NOT EXISTS postgis;' >/dev/null 2>&1 \
+  || true
 
 (
   while true; do
