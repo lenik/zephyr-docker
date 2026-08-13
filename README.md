@@ -14,7 +14,7 @@ Build and startup are modular: thin runners dispatch ordered hooks.
 | nvm / Node | `NVM_DIR=/usr/local/nvm` |
 | shared pnpm store | `/var/cache/pnpm/store` (unused for app install; kept for tooling) |
 | seed manifest | `/opt/minimal/package.json` (no kept `node_modules`) |
-| app + prisma seed | `/app` (includes `prisma/src/createId.ts` + host-built `node_modules`) |
+| app + prisma | `/app` (`prisma/` whole tree minus `node_modules`; client from host generate) |
 | web-e2e (optional) | `/opt/zephyr-e2e` + Chromium under `/opt/ms-playwright` (`-e`) |
 | mobile www (optional) | `/var/www/mobile` (`-m`; often overridden by i-local mount) |
 
@@ -82,7 +82,7 @@ copy is missing.
 
 ```bash
 make -C ../i-medium up
-curl -sf http://127.0.0.1:8990/api/health
+curl -sf http://127.0.0.1:8990/api/v1/health
 ```
 
 | Service | Replicas | Host |
