@@ -51,7 +51,7 @@ services:
       - ${ZEPHYR_DOCKER}/entrypoint.sh:/entrypoint.sh:ro
       - ${ZEPHYR_INSTANCE}/data:/home/data/project/zephyr
     ports:
-      - "${HOST_BACKEND_HTTP_PORT:-3178}:${BACKEND_HTTP_PORT:-8080}"
+      - "${HOST_BACKEND_HTTP_PORT:-6990}:${BACKEND_HTTP_PORT:-8080}"
     healthcheck:
       test:
         [
@@ -93,6 +93,6 @@ services:
     depends_on:
       - zephyr-web
     ports:
-      - "${HOST_WEB_HTTP_PORT:-8178}:80"
+      - "${HOST_WEB_HTTP_PORT:-8990}:80"
     volumes:
       - ${ZEPHYR_INSTANCE}/.run/lb.conf:/etc/nginx/conf.d/default.conf:ro

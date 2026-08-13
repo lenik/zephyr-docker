@@ -1,10 +1,8 @@
-# zephyr — single image zephyr:1.0
+# zephyr — compose template for instances
 #
-# Paths:
-#   ZEPHYR_DOCKER    — image/definition dir (this folder)
-#   ZEPHYR_INSTANCE  — runtime instance dir (e.g. ../i-local)
-#
-# Network: host|bridge overlays via Makefile
+# Prefer running from an instance dir (e.g. i-local/) which owns its own
+# compose + nginx + scripts. This file is kept for `make -C docker compose`
+# against INSTANCE=… and must not bind-mount files from docker/.
 
 name: zephyr
 
@@ -19,7 +17,6 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-zephyr}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-zephyr}
       POSTGRES_DB: ${POSTGRES_DB:-zephyr}
-      JWT_SECRET: ${JWT_SECRET:-change_me}
       PGPORT: ${PGPORT:-5990}
       BACKEND_HTTP_PORT: ${BACKEND_HTTP_PORT:-8080}
       BACKEND_HTTPS_PORT: ${BACKEND_HTTPS_PORT:-8443}
@@ -31,10 +28,15 @@ services:
       ZEPHYR_LOG_DIR: /home/data/project/zephyr/log/backend
       ZEPHYR_SKIP_SEED: ${ZEPHYR_SKIP_SEED:-}
       BACKUP_ROOT: /var/lib/zephyr
+      NODE_ENV: production
+      LANG: zh_CN.UTF-8
+      LC_ALL: zh_CN.UTF-8
+      TZ: Asia/Shanghai
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-zephyr-prod-access-secret-change-me}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-zephyr-prod-refresh-secret-change-me}
     volumes:
       - ${ZEPHYR_INSTANCE}/certs:/etc/nginx/certs:ro
-      - ${ZEPHYR_DOCKER}/entrypoint.sh:/entrypoint.sh:ro
-      - ${ZEPHYR_DOCKER}/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ${ZEPHYR_INSTANCE}/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ${ZEPHYR_INSTANCE}/.run/web.conf:/etc/nginx/conf.d/web.conf:ro
       - ${ZEPHYR_INSTANCE}/.run/mobile-web.conf:/etc/nginx/conf.d/mobile-web.conf:ro
       - ${ZEPHYR_INSTANCE}/.run/backend-ssl.conf:/etc/nginx/conf.d/backend-ssl.conf:ro
@@ -43,4 +45,4 @@ services:
       - ${ZEPHYR_INSTANCE}/backup:/var/lib/zephyr
       - ${ZEPHYR_INSTANCE}/log/nginx:/var/log/nginx
       - ${ZEPHYR_INSTANCE}/log/postgresql:/var/log/postgresql
-      - ${ZEPHYR_INSTANCE}/../mobile/dist:/var/www/mobile:ro
+      - ${ZEPHYR_INSTANCE}/www/mobile:/var/www/mobile:ro
