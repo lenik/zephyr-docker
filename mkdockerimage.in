@@ -94,6 +94,10 @@ function main() {
     done
     port0=$((backend_port % 1000))
     port1=$((port0 + 1))
+    port0=000$port0
+    port1=000$port1
+    port0=${port0: -3}
+    port1=${port1: -3}
 
     __FILE__=$(realpath "$0")
     __DIR__=${__FILE__%/*}
