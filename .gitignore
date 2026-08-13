@@ -1,4 +1,6 @@
 # Vendored Node (make vendor-node)
 vendor/
+.build-ctx/
+.build-ctx.prev/
 *.swp
 *.swo
