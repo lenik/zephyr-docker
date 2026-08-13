@@ -1,12 +1,12 @@
 # Install: sudo cp docker/logrotate/zephyr /etc/logrotate.d/zephyr
-# Adjust base path if compose tree is not /home/figma/zephyr/docker.
+# Runtime logs live under i-local/ (see ../i-local).
 
-# App logs (under datadir; also reachable via log/{backend,web,mobile} symlinks)
-/home/figma/zephyr/docker/data/log/backend/*.log
-/home/figma/zephyr/docker/data/log/web/*.log
-/home/figma/zephyr/docker/data/log/mobile/*.log
-/home/figma/zephyr/docker/log/nginx/*.log
-/home/figma/zephyr/docker/log/postgresql/*.log
+# App logs (under datadir; also reachable via i-local/log/{backend,web,mobile} symlinks)
+/home/figma/zephyr/i-local/data/log/backend/*.log
+/home/figma/zephyr/i-local/data/log/web/*.log
+/home/figma/zephyr/i-local/data/log/mobile/*.log
+/home/figma/zephyr/i-local/log/nginx/*.log
+/home/figma/zephyr/i-local/log/postgresql/*.log
 {
     weekly
     rotate 8
