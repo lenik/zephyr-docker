@@ -42,7 +42,8 @@ COPY ms-playwright /opt/ms-playwright
 COPY features.env /tmp/zephyr-features.env
 COPY entrypoint.sh /entrypoint.sh
 COPY source.d /opt/zephyr/source.d
-COPY nginx.conf /etc/nginx/nginx.conf
+COPY nginx/nginx.conf /etc/nginx/nginx.conf
+COPY nginx/ /opt/zephyr/nginx/
 COPY zephyr-pg-backup /usr/local/bin/zephyr-pg-backup
 
 WORKDIR /app

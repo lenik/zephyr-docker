@@ -31,7 +31,8 @@ mkdir -p "$CTX/app/backend" "$CTX/app/prisma" "$CTX/app/prisma-generated" \
 
 cp "$ROOT/Dockerfile" "$CTX/Dockerfile"
 cp "$ROOT/entrypoint.sh" "$CTX/entrypoint.sh"
-cp "$ROOT/nginx/nginx.conf" "$CTX/nginx.conf"
 cp "$ROOT/scripts/zephyr-pg-backup" "$CTX/zephyr-pg-backup"
 chmod +x "$CTX/entrypoint.sh" "$CTX/zephyr-pg-backup"
 rsync -a --delete "$ROOT/source.d/" "$CTX/source.d/"
+# Main nginx.conf + conf.d templates (web.conf.in, web-http.conf.in, …)
+rsync -a --delete "$ROOT/nginx/" "$CTX/nginx/"

@@ -68,6 +68,17 @@ copy is missing.
 | `backend` | Wait for external DB → migrate/seed → Node only |
 | `web` | nginx static + `/api` → `BACKEND_UPSTREAM` + `/uploads` |
 
+## nginx configs
+
+| File | Role |
+|------|------|
+| `nginx/nginx.conf` | Main process config; `include /etc/nginx/conf.d/*.conf` |
+| `nginx/web.conf.in` | HTTP+HTTPS vhost template (TLS when certs exist) |
+| `nginx/web-http.conf.in` | HTTP-only vhost fallback |
+
+`source.d/060nginx.sh` renders `/etc/nginx/conf.d/web.conf` from those templates
+(`sed` for ports / upstream / log paths). It does not embed the vhost body.
+
 ## All-in-one (`i-local`)
 
 | Service | In container | Host (bridge) |

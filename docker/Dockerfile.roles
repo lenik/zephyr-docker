@@ -1,10 +1,10 @@
-# Thin layer: role-aware entrypoint + nginx template on top of zephyr:1.0
+# Thin layer: role-aware entrypoint + nginx templates on top of zephyr:1.0
 ARG BASE_IMAGE=zephyr:1.0
 FROM ${BASE_IMAGE}
 
 COPY entrypoint.sh /entrypoint.sh
 COPY source.d /opt/zephyr/source.d
-COPY nginx/web.conf.in /opt/zephyr/nginx/web.conf.in
+COPY nginx/ /opt/zephyr/nginx/
 RUN chmod +x /entrypoint.sh \
     && mkdir -p /opt/zephyr/nginx
 

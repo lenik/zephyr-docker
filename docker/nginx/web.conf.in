@@ -38,8 +38,8 @@ server {
         try_files $uri $uri/ /index.html;
     }
 
-    access_log /home/data/project/zephyr/log/web/access.log;
-    error_log  /home/data/project/zephyr/log/web/error.log;
+    access_log __WEB_ACCESS_LOG__;
+    error_log  __WEB_ERROR_LOG__;
 }
 
 server {
@@ -83,6 +83,6 @@ server {
         try_files $uri $uri/ /index.html;
     }
 
-    access_log /home/data/project/zephyr/log/web/access.log;
-    error_log  /home/data/project/zephyr/log/web/error.log;
+    access_log __WEB_ACCESS_LOG__;
+    error_log  __WEB_ERROR_LOG__;
 }
