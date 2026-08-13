@@ -14,7 +14,8 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 source "$ROOT/scripts/lib/run-hooks.sh"
 
 export ROOT
-export REPO="$(cd "$ROOT/.." && pwd)"
+# Honor REPO from the environment (mkdockerimage / `make REPO=…`); default to parent of docker/.
+export REPO="${REPO:-$(cd "$ROOT/.." && pwd)}"
 export CTX="${CTX:-$ROOT/.build-ctx}"
 export RNM="$REPO/node_modules"
 export BNM="$REPO/backend/node_modules"

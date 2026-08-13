@@ -41,7 +41,7 @@ vendor-node:
 PREPARE_OPTS ?=
 
 prepare-context:
-	CTX=$(CTX) $(ROOT)/scripts/prepare-context.sh $(PREPARE_OPTS)
+	CTX=$(CTX) REPO=$(REPO) $(ROOT)/scripts/prepare-context.sh $(PREPARE_OPTS)
 
 inspect-context:
 	@test -d $(CTX) || { echo "missing $(CTX) — run: make prepare-context" >&2; exit 1; }

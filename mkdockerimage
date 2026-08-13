@@ -1,12 +1,14 @@
 #!/bin/bash
-    : ${RCSID:=$Id: - 0.4.0 2013-12-25 23:43:30 - $}
-    : ${PROGRAM_TITLE:="Make docker image"}
-    : ${PROGRAM_SYNTAX:="[OPTIONS]    [--] REPO"
-                        "(REPO is the path to the repository to make image from)"}
+    : ${RCSID:=$Id: - 0.5.0 2026-08-13 14:00:00 - $}
+    : ${PROGRAM_TITLE:="Make docker image from DockerTempl"}
+    : ${PROGRAM_SYNTAX:="[OPTIONS] [--] REPO"
+                        "(REPO is the path to the application repository)"}
 
     . shlib-import cliboot
-    option -e --e2e            "Include e2e module"
-    option -m --mobile         "Include mobile module"
+    option -e --e2e            "Include e2e / Playwright module"
+    option -m --mobile         "Include mobile www module"
+    option -f --force-build    "Force web/backend rebuild in prepare-context"
+    option -k --keep-temp      "Keep forked template temp dir on failure"
     option -q --quiet
     option -v --verbose
     option -h --help
@@ -14,6 +16,8 @@
 
     opt_e2e=0
     opt_mobile=0
+    opt_force_build=0
+    opt_keep_temp=0
 
 function setopt() {
     case "$1" in
@@ -21,6 +25,10 @@ function setopt() {
             opt_e2e=1;;
         -m|--mobile)
             opt_mobile=1;;
+        -f|--force-build)
+            opt_force_build=1;;
+        -k|--keep-temp)
+            opt_keep_temp=1;;
         -h|--help)
             help $1; exit;;
         -q|--quiet)
@@ -39,38 +47,94 @@ function main() {
     if [ -z "$repo" ]; then
         repo="$PWD"
     fi
-    repodir=$( realpath "$repo" )
-    
-    projectname=$( basename "$repodir" )
-    PROJECTNAME=$( echo "$projectname" | tr '[:lower:]' '[:upper:]' )
+    if [ ! -d "$repo" ]; then
+        quit "repo not found: $repo"
+    fi
+    repodir=$(realpath "$repo")
 
+    if [ ! -d "$repodir/backend" ] || [ ! -d "$repodir/web" ] || [ ! -d "$repodir/prisma" ]; then
+        quit "repo missing backend/, web/, or prisma/: $repodir"
+    fi
+
+    projectname=$(basename "$repodir")
+    PROJECTNAME=$(echo "$projectname" | tr '[:lower:]' '[:upper:]')
+
+    # Prefer live .env PORT, else .env.example. Template ports use x990/x991
+    # (e.g. PG 5990, host web 8990); replaced with (PORT%1000) and +1.
     backend_port=3000
-    for envfile in "$repodir/backend/.env.example" "$repodir/backend/.env"; do
+    for envfile in "$repodir/backend/.env" "$repodir/backend/.env.example"; do
         if [ -f "$envfile" ]; then
-            if match=$( grep -P -o '^PORT=(\d+)$' "$envfile" ); then
+            if match=$(grep -P -o '^PORT=(\d+)$' "$envfile"); then
                 backend_port=${match#PORT=}
                 break
             fi
         fi
-    fi
-    port0=$(( backend_port % 1000 ))
-    port1=$(( port0 + 1 ))
+    done
+    port0=$((backend_port % 1000))
+    port1=$((port0 + 1))
 
-    templdir=$( dirname "$0" )
-    forkdir=$( mktemp -d -t dockerXXXXXX )
-    
-    rsync -amv "$templdir/" "$forkdir/"
-    repl -ru "zep""hyr" "$projectname" "$forkdir"
-    repl -ru "ZEP""HYR" "$PROJECTNAME" "$forkdir"
+    __FILE__=$( readlink -f "$0" )
+    templdir=$(cd "$(dirname "$__FILE__")" && pwd)
+    forkdir=$(mktemp -d -t "docker-${projectname}.XXXXXX")
+    cleanup() {
+        if [ "$opt_keep_temp" -eq 1 ]; then
+            _log1 "keeping temp fork: $forkdir"
+            return 0
+        fi
+        rm -rf "$forkdir"
+    }
+    trap cleanup EXIT
+
+    _log1 "template: $templdir"
+    _log1 "repo:     $repodir ($projectname)"
+    _log1 "ports:    *${port0} / *${port1}  (from backend PORT=$backend_port)"
+
+    # Materialize a project-specific fork (do not pollute the template tree).
+    rsync -a \
+        --exclude '.git/' \
+        --exclude '.build-ctx/' \
+        --exclude '.build-ctx.prev/' \
+        --exclude 'vendor/' \
+        --exclude 'mkdockerimage' \
+        "$templdir/" "$forkdir/"
+
+    # Split literals so this script itself is not rewritten by repl.
+    repl -ru zep""hyr "$projectname" "$forkdir"
+    repl -ru ZEP""HYR "$PROJECTNAME" "$forkdir"
     repl -ru 9"9"0 "$port0" "$forkdir"
     repl -ru 9"9"1 "$port1" "$forkdir"
 
-    #repodockerdir="$repodir/docker"
-    #rsync -amv "$forkdir/" "$repodockerdir/"
-    #cd $repodockerdir
+    # repl only rewrites file contents — rename paths that still contain the placeholder.
+    while IFS= read -r -d '' path; do
+        base=$(basename "$path")
+        dir=$(dirname "$path")
+        newbase=${base//zep''hyr/$projectname}
+        newbase=${newbase//ZEP''HYR/$PROJECTNAME}
+        if [ "$base" != "$newbase" ]; then
+            _log1 "rename $(realpath --relative-to="$forkdir" "$path" 2>/dev/null || echo "$base") → $newbase"
+            mv "$path" "$dir/$newbase"
+        fi
+    done < <(find "$forkdir" -depth \( -name '*zep''hyr*' -o -name '*ZEP''HYR*' \) -print0)
 
-    cd "$forkdir"
-    REPO="$repodir" make build
+    repodockerdir="$repodir/docker"
+    mkdir -p "$repodockerdir"
+    _log1 "install → $repodockerdir"
+    rsync -a --delete \
+        --exclude '.build-ctx/' \
+        --exclude '.build-ctx.prev/' \
+        --exclude 'vendor/' \
+        "$forkdir/" "$repodockerdir/"
+
+    prepare_opts=()
+    [ "$opt_e2e" -eq 1 ] && prepare_opts+=(-e)
+    [ "$opt_mobile" -eq 1 ] && prepare_opts+=(-m)
+    [ "$opt_force_build" -eq 1 ] && prepare_opts+=(-f)
+
+    _log1 "make -C docker build PREPARE_OPTS='${prepare_opts[*]}'"
+    # ROOT=docker → default REPO=docker/.. is the app repo; pass explicitly anyway.
+    make -C "$repodockerdir" build \
+        REPO="$repodir" \
+        PREPARE_OPTS="${prepare_opts[*]}"
 }
 
 boot "$@"
