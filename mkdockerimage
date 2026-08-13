@@ -1,0 +1,76 @@
+#!/bin/bash
+    : ${RCSID:=$Id: - 0.4.0 2013-12-25 23:43:30 - $}
+    : ${PROGRAM_TITLE:="Make docker image"}
+    : ${PROGRAM_SYNTAX:="[OPTIONS]    [--] REPO"
+                        "(REPO is the path to the repository to make image from)"}
+
+    . shlib-import cliboot
+    option -e --e2e            "Include e2e module"
+    option -m --mobile         "Include mobile module"
+    option -q --quiet
+    option -v --verbose
+    option -h --help
+    option    --version
+
+    opt_e2e=0
+    opt_mobile=0
+
+function setopt() {
+    case "$1" in
+        -e|--e2e)
+            opt_e2e=1;;
+        -m|--mobile)
+            opt_mobile=1;;
+        -h|--help)
+            help $1; exit;;
+        -q|--quiet)
+            LOGLEVEL=$((LOGLEVEL - 1));;
+        -v|--verbose)
+            LOGLEVEL=$((LOGLEVEL + 1));;
+        --version)
+            show_version; exit;;
+        *)
+            quit "invalid option: $1";;
+    esac
+}
+
+function main() {
+    local repo="$1"
+    if [ -z "$repo" ]; then
+        repo="$PWD"
+    fi
+    repodir=$( realpath "$repo" )
+    
+    projectname=$( basename "$repodir" )
+    PROJECTNAME=$( echo "$projectname" | tr '[:lower:]' '[:upper:]' )
+
+    backend_port=3000
+    for envfile in "$repodir/backend/.env.example" "$repodir/backend/.env"; do
+        if [ -f "$envfile" ]; then
+            if match=$( grep -P -o '^PORT=(\d+)$' "$envfile" ); then
+                backend_port=${match#PORT=}
+                break
+            fi
+        fi
+    fi
+    port0=$(( backend_port % 1000 ))
+    port1=$(( port0 + 1 ))
+
+    templdir=$( dirname "$0" )
+    forkdir=$( mktemp -d -t dockerXXXXXX )
+    
+    rsync -amv "$templdir/" "$forkdir/"
+    repl -ru "zep""hyr" "$projectname" "$forkdir"
+    repl -ru "ZEP""HYR" "$PROJECTNAME" "$forkdir"
+    repl -ru 9"9"0 "$port0" "$forkdir"
+    repl -ru 9"9"1 "$port1" "$forkdir"
+
+    #repodockerdir="$repodir/docker"
+    #rsync -amv "$forkdir/" "$repodockerdir/"
+    #cd $repodockerdir
+
+    cd "$forkdir"
+    REPO="$repodir" make build
+}
+
+boot "$@"
