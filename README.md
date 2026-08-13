@@ -1,21 +1,62 @@
 # docker — zephyr image
 
-Build / push / pull the **`zephyr:1.0`** image. Runtime instances:
+Base: **`b4f-rockynode:10`** (Node / Postgres / nginx already in the base).
 
-- **[../i-local](../i-local)** — all-in-one (postgres + backend + nginx)
-- **[../i-medium](../i-medium)** — split: 1× postgres + 1× backend + 3× web + lb
-- **[../k8s](../k8s)** — same medium topology on local minikube (default) or k3d
+Build and startup are modular: thin runners dispatch ordered hooks.
+
+| Dir | Runner | Rule |
+|-----|--------|------|
+| `context.d/` | `scripts/prepare-context.sh` | `*.sh` sourced; other files run as subprocess |
+| `source.d/` | `entrypoint.sh` → `/opt/zephyr/source.d` | same |
+
+| Item | Path |
+|------|------|
+| nvm / Node | `NVM_DIR=/usr/local/nvm` |
+| shared pnpm store | `/var/cache/pnpm/store` (unused for app install; kept for tooling) |
+| seed manifest | `/opt/minimal/package.json` (no kept `node_modules`) |
+| app + prisma seed | `/app` (includes `prisma/src/createId.ts` + host-built `node_modules`) |
+| web-e2e (optional) | `/opt/zephyr-e2e` + Chromium under `/opt/ms-playwright` (`-e`) |
+| mobile www (optional) | `/var/www/mobile` (`-m`; often overridden by i-local mount) |
+
+App image **does not** `pnpm install` from the registry. `prepare-context` installs
+prod deps on the **host** (`prefer-offline` from `~/.local/share/pnpm/store`) into
+`.build-ctx/app/node_modules/` (reused while lockfile unchanged). The Dockerfile only
+verifies natives (e.g. argon2) — usually seconds, not minutes.
+
+Deps COPY is separate from `backend/dist`, so code-only rebuilds reuse the cached
+node_modules layer.
+
+Then injects schema-generated `.prisma/client`. Backend is **tsc** `dist/` (no esbuild bundle).
+`prepare-context` skips `pnpm -C web|backend build` when `dist/` is newer than sources.
+Optional modules: `-e/--web-e2e`, `-m/--mobile`, `-a/--all`, `-f/--force-build`.
+
+Runtime instances (outside this template):
+
+- **i-local** — all-in-one (postgres + backend + nginx); owns its own compose + nginx
+- **i-medium** — split: 1× postgres + 1× backend + 3× web + lb
+- **k8s** — same medium topology on local minikube (default) or k3d
 
 ```bash
-pnpm install && pnpm build
-cd docker
-make build          # → zephyr:1.0 + 183.131.83.99:1244/zephyr:1.0
+# deps already installed on host; default PREPARE_OPTS= (lean: no e2e/Chromium)
+cd docker && make build
+# + Playwright suite and Chromium (host-cached CfT download, then COPY into image):
+# make build PREPARE_OPTS=-e
+# + mobile www:
+# make build PREPARE_OPTS='-e -m'
+# force rebuilds + all modules:
+# make build PREPARE_OPTS='-a -f'
+# force refresh of context node_modules:
+# PNPM_FETCH_FORCE=1 make build
+make inspect-context
 make build-roles    # thin layer: entrypoint roles backend|web|zephyr
 make push
 make pull
-make compose        # render all-in-one compose (ZEPHYR_INSTANCE=../i-local)
-make compose-medium # render medium compose (ZEPHYR_INSTANCE=../i-medium)
 ```
+
+Chromium for Testing is installed on the **host** during `prepare-context -e` into
+`PLAYWRIGHT_HOST_BROWSERS` (default `~/.cache/ms-playwright`), then copied into the
+build context. The image build only downloads inside the container if that cache
+copy is missing.
 
 ## Entrypoint roles
 
@@ -41,12 +82,12 @@ make compose-medium # render medium compose (ZEPHYR_INSTANCE=../i-medium)
 
 ```bash
 make -C ../i-medium up
-curl -sf http://127.0.0.1:8178/api/health
+curl -sf http://127.0.0.1:8990/api/health
 ```
 
 | Service | Replicas | Host |
 |---------|----------|------|
 | postgresql | 1 | (internal) |
-| zephyr-backend | 1 | `3178` |
+| zephyr-backend | 1 | `6990` |
 | zephyr-web | 3 | via lb |
-| zephyr-lb | 1 | `8178` |
+| zephyr-lb | 1 | `8990` |
