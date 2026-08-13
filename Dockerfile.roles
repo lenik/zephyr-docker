@@ -3,6 +3,7 @@ ARG BASE_IMAGE=zephyr:1.0
 FROM ${BASE_IMAGE}
 
 COPY entrypoint.sh /entrypoint.sh
+COPY source.d /opt/zephyr/source.d
 COPY nginx/web.conf.in /opt/zephyr/nginx/web.conf.in
 RUN chmod +x /entrypoint.sh \
     && mkdir -p /opt/zephyr/nginx

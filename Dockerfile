@@ -1,16 +1,19 @@
-ARG BASE_IMAGE=183.131.83.99:1244/b4f-rocky:10
+ARG BASE_IMAGE=b4f-rockynode:10
 FROM ${BASE_IMAGE}
+
+# Entrypoint needs root (postgres init, nginx). Base defaults to USER node.
+USER root
 
 LABEL org.opencontainers.image.title="zephyr"
 LABEL org.opencontainers.image.version="1.0"
 
-RUN --mount=type=cache,id=zephyr-dnf,target=/var/cache/dnf,sharing=locked \
-    dnf -y --setopt=install_weak_deps=False install \
-      ca-certificates xz tar nginx \
-      postgresql-server postgresql \
-    && dnf -y clean all \
-    && rm -f /etc/nginx/conf.d/default.conf \
-    && mkdir -p \
+ENV LANG=zh_CN.UTF-8 \
+    LC_ALL=zh_CN.UTF-8 \
+    JWT_ACCESS_SECRET=zephyr-prod-access-secret-change-me \
+    JWT_REFRESH_SECRET=zephyr-prod-refresh-secret-change-me \
+    PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
+
+RUN mkdir -p \
       /home/data/project/zephyr/upload \
       /home/data/project/zephyr/cache \
       /home/data/project/zephyr/log/backend \
@@ -26,39 +29,83 @@ RUN --mount=type=cache,id=zephyr-dnf,target=/var/cache/dnf,sharing=locked \
       /var/www/mobile \
       /etc/nginx/certs \
       /app \
+      /opt/ms-playwright \
     && chown -R postgres:postgres \
-      /var/lib/pgsql /var/lib/zephyr /var/log/postgresql /var/run/postgresql
+      /var/lib/pgsql /var/lib/zephyr /var/log/postgresql /var/run/postgresql \
+    && chown node:node /opt/ms-playwright
 
-# Context prepared by `make prepare-context` on /tmp (vendor node + app + web)
-COPY node /usr/local/node
-RUN set -eux; \
-    test -x /usr/local/node/bin/node; \
-    test -f /usr/local/node/lib/node_modules/npm/bin/npm-cli.js; \
-    ln -sfn /usr/local/node/bin/node /usr/local/bin/node; \
-    ln -sfn /usr/local/node/bin/npm /usr/local/bin/npm; \
-    ln -sfn /usr/local/node/bin/npx /usr/local/bin/npx; \
-    if [[ -e /usr/local/node/bin/pnpm ]]; then ln -sfn /usr/local/node/bin/pnpm /usr/local/bin/pnpm; fi; \
-    chmod 755 /usr/local/node/bin/node; \
-    node -v; npm -v
-
-COPY app /app
-COPY web /var/www/zephyr
-COPY mobile-www /var/www/mobile
+# --- deps layer: host-prepared node_modules (cached while lockfile unchanged) ---
+COPY app/package.json app/pnpm-lock.yaml /app/
+COPY app/node_modules /app/node_modules
+COPY e2e /opt/zephyr-e2e
+COPY ms-playwright /opt/ms-playwright
+COPY features.env /tmp/zephyr-features.env
 COPY entrypoint.sh /entrypoint.sh
+COPY source.d /opt/zephyr/source.d
+COPY nginx.conf /etc/nginx/nginx.conf
 COPY zephyr-pg-backup /usr/local/bin/zephyr-pg-backup
-RUN chmod +x /entrypoint.sh /usr/local/bin/zephyr-pg-backup \
-    && ln -sfn /app/node_modules/.bin/tsx /usr/local/bin/tsx 2>/dev/null || true \
-    && ln -sfn /app/node_modules/.bin/prisma /usr/local/bin/prisma 2>/dev/null || true \
-    && if [[ -x /app/node_modules/prisma/build/index.js ]]; then \
-         printf '%s\n' '#!/bin/sh' 'exec node /app/node_modules/prisma/build/index.js "$@"' > /usr/local/bin/prisma; \
-         chmod +x /usr/local/bin/prisma; \
-       fi; \
-    if [[ -f /app/node_modules/tsx/dist/cli.mjs ]]; then \
-         printf '%s\n' '#!/bin/sh' 'exec node /app/node_modules/tsx/dist/cli.mjs "$@"' > /usr/local/bin/tsx; \
-         chmod +x /usr/local/bin/tsx; \
-       fi
 
 WORKDIR /app
+
+# Host-copied node_modules keep a host pnpm storeDir; do not `pnpm rebuild`.
+# argon2 ships linux glibc prebuilds — just verify require() works.
+RUN chmod +x /entrypoint.sh /usr/local/bin/zephyr-pg-backup \
+    && chown -R node:node /app /opt/zephyr-e2e \
+    && export PRISMA_CLI_BINARY_TARGETS=rhel-openssl-3.0.x \
+    && printf '%s\n' "store-dir=/var/cache/pnpm/store" > /app/.npmrc \
+    && chown node:node /app/.npmrc \
+    && echo "zephyr: verify argon2 (prebuilt .node; no pnpm rebuild — host store path mismatch)" \
+    && runuser -u node -- env HOME=/home/node \
+         bash -lc 'node -e "require(\"argon2\")"' \
+    && if [ -f /opt/zephyr-e2e/package.json ]; then \
+         dnf install -y --setopt=install_weak_deps=False \
+           alsa-lib atk at-spi2-atk cairo cups-libs dbus-libs \
+           gtk3 libX11 libXcomposite libXdamage libXext libXfixes \
+           libXrandr libxcb libxkbcommon mesa-libgbm nss nspr pango \
+           libatomic \
+         && dnf clean all \
+         && if [ ! -d /opt/zephyr-e2e/node_modules ]; then \
+              echo "zephyr: ERROR e2e packaged without node_modules — re-run prepare-context -e" >&2; \
+              exit 1; \
+            fi \
+         && if [ -n "$(find /opt/ms-playwright -type f \( -name chrome -o -name chrome-headless-shell -o -name chromium \) 2>/dev/null | head -1)" ]; then \
+              echo "zephyr: Chromium reused from build context (host Playwright cache)"; \
+            else \
+              echo "zephyr: Chromium missing in context — downloading inside image build…"; \
+              runuser -u node -- env HOME=/home/node \
+                PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright \
+                bash -lc 'cd /opt/zephyr-e2e && pnpm exec playwright install chromium'; \
+            fi \
+         && test -f /opt/zephyr-e2e/node_modules/@playwright/test/package.json \
+         && test -n "$(find /opt/ms-playwright -type f \( -name chrome -o -name chrome-headless-shell -o -name chromium \) 2>/dev/null | head -1)"; \
+       else \
+         echo "zephyr: e2e module omitted in this image"; \
+       fi \
+    && test -f node_modules/fastify/package.json \
+    && test -f node_modules/argon2/package.json \
+    && test -f node_modules/decimal.js/package.json
+
+# --- app payload (changes often; does not re-copy node_modules) ---
+COPY app/backend /app/backend
+COPY app/prisma /app/prisma
+COPY app/prisma-generated /app/prisma-generated
+COPY web /var/www/zephyr
+COPY mobile-www /var/www/mobile
+
+RUN mkdir -p node_modules/.prisma \
+    && rm -rf node_modules/.prisma/client \
+    && cp -a prisma-generated node_modules/.prisma/client \
+    && for d in node_modules/.pnpm/@prisma+client@*/node_modules; do \
+         mkdir -p "$d/.prisma"; \
+         rm -rf "$d/.prisma/client"; \
+         cp -a prisma-generated "$d/.prisma/client"; \
+       done \
+    && rm -rf prisma-generated \
+    && chown -R node:node /app /opt/zephyr-e2e /opt/ms-playwright /var/cache/pnpm /opt/minimal \
+    && test -f node_modules/.prisma/client/libquery_engine-rhel-openssl-3.0.x.so.node \
+    && test -f node_modules/.pnpm/@prisma+client@*/node_modules/.prisma/client/index.js \
+    && test -f /app/prisma/src/createId.ts \
+    && rm -f /tmp/zephyr-features.env
 
 ENV PGDATA=/var/lib/pgsql/data/pgdata \
     BACKUP_ROOT=/var/lib/zephyr \
@@ -66,9 +113,11 @@ ENV PGDATA=/var/lib/pgsql/data/pgdata \
     ZEPHYR_DATA_DIR=/home/data/project/zephyr \
     ZEPHYR_UPLOAD_DIR=/home/data/project/zephyr/upload \
     ZEPHYR_CACHE_DIR=/home/data/project/zephyr/cache \
-    ZEPHYR_LOG_DIR=/home/data/project/zephyr/log/backend
+    ZEPHYR_LOG_DIR=/home/data/project/zephyr/log/backend \
+    PNPM_STORE_DIR=/var/cache/pnpm/store \
+    PATH=/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-EXPOSE 80 443 8080 8443 8081 5432
+EXPOSE 80 443 8080 8443 8081 5990
 
 VOLUME [ \
   "/home/data/project/zephyr", \
