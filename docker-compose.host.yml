@@ -1,0 +1,4 @@
+# Host: listen on host ports directly (no publish remap).
+services:
+  zephyr:
+    network_mode: host

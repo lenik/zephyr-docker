@@ -1,0 +1,46 @@
+# zephyr — single image zephyr:1.0
+#
+# Paths:
+#   ZEPHYR_DOCKER    — image/definition dir (this folder)
+#   ZEPHYR_INSTANCE  — runtime instance dir (e.g. ../i-local)
+#
+# Network: host|bridge overlays via Makefile
+
+name: zephyr
+
+services:
+  zephyr:
+    image: zephyr:1.0
+    pull_policy: never
+    container_name: zephyr
+    hostname: zephyr
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-zephyr}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-zephyr}
+      POSTGRES_DB: ${POSTGRES_DB:-zephyr}
+      JWT_SECRET: ${JWT_SECRET:-change_me}
+      PGPORT: ${PGPORT:-5786}
+      BACKEND_HTTP_PORT: ${BACKEND_HTTP_PORT:-8080}
+      BACKEND_HTTPS_PORT: ${BACKEND_HTTPS_PORT:-8443}
+      PORT: ${BACKEND_HTTP_PORT:-8080}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-zephyr}:${POSTGRES_PASSWORD:-zephyr}@127.0.0.1:${PGPORT:-5786}/${POSTGRES_DB:-zephyr}
+      ZEPHYR_DATA_DIR: /home/data/project/zephyr
+      ZEPHYR_UPLOAD_DIR: /home/data/project/zephyr/upload
+      ZEPHYR_CACHE_DIR: /home/data/project/zephyr/cache
+      ZEPHYR_LOG_DIR: /home/data/project/zephyr/log/backend
+      ZEPHYR_SKIP_SEED: ${ZEPHYR_SKIP_SEED:-}
+      BACKUP_ROOT: /var/lib/zephyr
+    volumes:
+      - ${ZEPHYR_INSTANCE}/certs:/etc/nginx/certs:ro
+      - ${ZEPHYR_DOCKER}/entrypoint.sh:/entrypoint.sh:ro
+      - ${ZEPHYR_DOCKER}/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ${ZEPHYR_INSTANCE}/.run/web.conf:/etc/nginx/conf.d/web.conf:ro
+      - ${ZEPHYR_INSTANCE}/.run/mobile-web.conf:/etc/nginx/conf.d/mobile-web.conf:ro
+      - ${ZEPHYR_INSTANCE}/.run/backend-ssl.conf:/etc/nginx/conf.d/backend-ssl.conf:ro
+      - ${ZEPHYR_INSTANCE}/data:/home/data/project/zephyr
+      - ${ZEPHYR_INSTANCE}/db:/var/lib/pgsql/data
+      - ${ZEPHYR_INSTANCE}/backup:/var/lib/zephyr
+      - ${ZEPHYR_INSTANCE}/log/nginx:/var/log/nginx
+      - ${ZEPHYR_INSTANCE}/log/postgresql:/var/log/postgresql
+      - ${ZEPHYR_INSTANCE}/../mobile/dist:/var/www/mobile:ro

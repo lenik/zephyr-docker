@@ -1,0 +1,16 @@
+# mobile-web — Expo web static
+server {
+    listen      __MOBILE_WEB_PORT__ default_server;
+    listen      [::]:__MOBILE_WEB_PORT__ default_server;
+    server_name _;
+
+    root  /var/www/mobile;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    access_log /home/data/project/zephyr/log/mobile/access.log;
+    error_log  /home/data/project/zephyr/log/mobile/error.log;
+}

@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Base backup under /var/lib/zephyr/base/YYYYMMDD-HHMMSS (host: backup/base/)
+set -euo pipefail
+
+PGDATA="${PGDATA:-/var/lib/pgsql/data}"
+BACKUP_ROOT="${BACKUP_ROOT:-/var/lib/zephyr}"
+STAMP="$(date +%Y%m%d-%H%M%S)"
+DEST="$BACKUP_ROOT/base/$STAMP"
+
+mkdir -p "$BACKUP_ROOT/base" "$BACKUP_ROOT/wal"
+runuser -u postgres -- pg_basebackup -D "$DEST" -Fp -X none \
+  -U "${POSTGRES_USER:-zephyr}" -h 127.0.0.1 2>/dev/null \
+  || runuser -u postgres -- pg_basebackup -D "$DEST" -Fp -X none -U postgres -h 127.0.0.1
+
+ls -1dt "$BACKUP_ROOT/base"/*/ 2>/dev/null | tail -n +8 | xargs -r rm -rf
+echo "base backup: $DEST"

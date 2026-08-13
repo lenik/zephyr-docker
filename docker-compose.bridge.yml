@@ -1,0 +1,9 @@
+# Bridge: container listens on internal ports; host publishes mapped ports.
+services:
+  zephyr:
+    ports:
+      - "${HOST_BACKEND_HTTP_PORT:-6786}:${BACKEND_HTTP_PORT:-8080}"
+      - "${HOST_BACKEND_HTTPS_PORT:-6079}:${BACKEND_HTTPS_PORT:-8443}"
+      - "${HOST_WEB_HTTP_PORT:-8786}:${WEB_HTTP_PORT:-80}"
+      - "${HOST_WEB_HTTPS_PORT:-8079}:${WEB_HTTPS_PORT:-443}"
+      - "${HOST_MOBILE_WEB_PORT:-18786}:${MOBILE_WEB_PORT:-8081}"

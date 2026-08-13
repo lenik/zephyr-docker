@@ -1,0 +1,98 @@
+# zephyr-medium — split topology:
+#   1× postgresql  →  1× zephyr-backend  →  3× zephyr-web  ← zephyr-lb (host entry)
+#
+# Paths:
+#   ZEPHYR_DOCKER    — image/definition dir (this folder)
+#   ZEPHYR_INSTANCE  — runtime instance dir (e.g. ../i-medium)
+
+name: zephyr-medium
+
+services:
+  postgresql:
+    image: postgres:16
+    pull_policy: if_not_present
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-zephyr}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-zephyr}
+      POSTGRES_DB: ${POSTGRES_DB:-zephyr}
+    volumes:
+      - ${ZEPHYR_INSTANCE}/db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-zephyr} -d ${POSTGRES_DB:-zephyr}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  zephyr-backend:
+    image: ${ZEPHYR_IMAGE:-zephyr:1.0}
+    pull_policy: never
+    restart: unless-stopped
+    command: ["backend"]
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-zephyr}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-zephyr}
+      POSTGRES_DB: ${POSTGRES_DB:-zephyr}
+      POSTGRES_HOST: postgresql
+      PGPORT: "5786"
+      JWT_SECRET: ${JWT_SECRET:-change_me}
+      PORT: ${BACKEND_HTTP_PORT:-8080}
+      BACKEND_HTTP_PORT: ${BACKEND_HTTP_PORT:-8080}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-zephyr}:${POSTGRES_PASSWORD:-zephyr}@postgresql:5786/${POSTGRES_DB:-zephyr}
+      ZEPHYR_DATA_DIR: /home/data/project/zephyr
+      ZEPHYR_UPLOAD_DIR: /home/data/project/zephyr/upload
+      ZEPHYR_CACHE_DIR: /home/data/project/zephyr/cache
+      ZEPHYR_LOG_DIR: /home/data/project/zephyr/log/backend
+      ZEPHYR_SKIP_SEED: ${ZEPHYR_SKIP_SEED:-}
+    volumes:
+      - ${ZEPHYR_DOCKER}/entrypoint.sh:/entrypoint.sh:ro
+      - ${ZEPHYR_INSTANCE}/data:/home/data/project/zephyr
+    ports:
+      - "${HOST_BACKEND_HTTP_PORT:-3178}:${BACKEND_HTTP_PORT:-8080}"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8080/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+
+  zephyr-web:
+    image: ${ZEPHYR_IMAGE:-zephyr:1.0}
+    pull_policy: never
+    restart: unless-stopped
+    command: ["web"]
+    depends_on:
+      zephyr-backend:
+        condition: service_healthy
+    environment:
+      WEB_HTTP_PORT: "80"
+      BACKEND_UPSTREAM: zephyr-backend:${BACKEND_HTTP_PORT:-8080}
+      ZEPHYR_DATA_DIR: /home/data/project/zephyr
+      ZEPHYR_UPLOAD_DIR: /home/data/project/zephyr/upload
+      ZEPHYR_CACHE_DIR: /home/data/project/zephyr/cache
+    volumes:
+      - ${ZEPHYR_DOCKER}/entrypoint.sh:/entrypoint.sh:ro
+      - ${ZEPHYR_DOCKER}/nginx/web.conf.in:/opt/zephyr/nginx/web.conf.in:ro
+      - ${ZEPHYR_INSTANCE}/data:/home/data/project/zephyr
+    # Scale with: docker compose … up -d --scale zephyr-web=3
+    # (no host ports — zephyr-lb publishes the entry)
+
+  zephyr-lb:
+    image: nginx:alpine
+    pull_policy: if_not_present
+    restart: unless-stopped
+    depends_on:
+      - zephyr-web
+    ports:
+      - "${HOST_WEB_HTTP_PORT:-8178}:80"
+    volumes:
+      - ${ZEPHYR_INSTANCE}/.run/lb.conf:/etc/nginx/conf.d/default.conf:ro

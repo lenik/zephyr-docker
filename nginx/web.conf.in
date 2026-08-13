@@ -1,0 +1,88 @@
+# web — admin UI; listen ports substituted by `make prepare`
+upstream zephyr_backend {
+    server __BACKEND_UPSTREAM__;
+}
+
+server {
+    listen      __WEB_HTTP_PORT__ default_server;
+    listen      [::]:__WEB_HTTP_PORT__ default_server;
+    server_name _;
+
+    root  /var/www/zephyr;
+    index index.html;
+    client_max_body_size 32m;
+
+    location /api/ {
+        proxy_pass http://zephyr_backend/api/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_buffering off;
+        proxy_cache off;
+        chunked_transfer_encoding on;
+    }
+
+    location /uploads/cache/ {
+        alias /home/data/project/zephyr/cache/;
+        autoindex off;
+    }
+
+    location /uploads/ {
+        alias /home/data/project/zephyr/upload/;
+        autoindex off;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    access_log /home/data/project/zephyr/log/web/access.log;
+    error_log  /home/data/project/zephyr/log/web/error.log;
+}
+
+server {
+    listen      __WEB_HTTPS_PORT__ ssl default_server;
+    listen      [::]:__WEB_HTTPS_PORT__ ssl default_server;
+    server_name _;
+
+    ssl_certificate     /etc/nginx/certs/domain.crt;
+    ssl_certificate_key /etc/nginx/certs/domain.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_session_cache   shared:SSL:10m;
+    ssl_session_timeout 1d;
+
+    root  /var/www/zephyr;
+    index index.html;
+    client_max_body_size 32m;
+
+    location /api/ {
+        proxy_pass http://zephyr_backend/api/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_buffering off;
+        proxy_cache off;
+        chunked_transfer_encoding on;
+    }
+
+    location /uploads/cache/ {
+        alias /home/data/project/zephyr/cache/;
+        autoindex off;
+    }
+
+    location /uploads/ {
+        alias /home/data/project/zephyr/upload/;
+        autoindex off;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    access_log /home/data/project/zephyr/log/web/access.log;
+    error_log  /home/data/project/zephyr/log/web/error.log;
+}

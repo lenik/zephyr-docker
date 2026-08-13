@@ -1,0 +1,20 @@
+# Install: sudo cp docker/logrotate/zephyr /etc/logrotate.d/zephyr
+# Adjust base path if compose tree is not /home/figma/zephyr/docker.
+
+# App logs (under datadir; also reachable via log/{backend,web,mobile} symlinks)
+/home/figma/zephyr/docker/data/log/backend/*.log
+/home/figma/zephyr/docker/data/log/web/*.log
+/home/figma/zephyr/docker/data/log/mobile/*.log
+/home/figma/zephyr/docker/log/nginx/*.log
+/home/figma/zephyr/docker/log/postgresql/*.log
+{
+    weekly
+    rotate 8
+    size 50M
+    missingok
+    notifempty
+    compress
+    delaycompress
+    copytruncate
+    create 0664 root root
+}
