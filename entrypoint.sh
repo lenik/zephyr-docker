@@ -19,8 +19,8 @@ POSTGRES_USER="${POSTGRES_USER:-zephyr}"
 POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-zephyr}"
 POSTGRES_DB="${POSTGRES_DB:-zephyr}"
 POSTGRES_HOST="${POSTGRES_HOST:-}"
-# Host-network deploys often already have host Postgres on 5786 — override with PGPORT.
-PGPORT="${PGPORT:-5786}"
+# Host-network deploys often already have host Postgres on 5990 — override with PGPORT.
+PGPORT="${PGPORT:-5990}"
 BACKEND_HTTP_PORT="${BACKEND_HTTP_PORT:-${PORT:-8080}}"
 WEB_HTTP_PORT="${WEB_HTTP_PORT:-80}"
 WEB_HTTPS_PORT="${WEB_HTTPS_PORT:-443}"
@@ -79,7 +79,7 @@ db_host_from_url() {
 wait_for_db() {
   local host port i
   host="$(db_host_from_url)"
-  port="${PGPORT:-5786}"
+  port="${PGPORT:-5990}"
   if [[ "$DATABASE_URL" =~ @[^/]+:([0-9]+)/ ]]; then
     port="${BASH_REMATCH[1]}"
   fi
@@ -167,7 +167,7 @@ migrate_with_database_url() {
   echo "[zephyr] applying SQL migrations via DATABASE_URL…"
   # Official postgres image: app role owns the DB — enough for DDL.
   migrate_apply_sql env PGPASSWORD="$POSTGRES_PASSWORD" psql -v ON_ERROR_STOP=1 \
-    -h "$(db_host_from_url)" -p "${PGPORT:-5786}" -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+    -h "$(db_host_from_url)" -p "${PGPORT:-5990}" -U "$POSTGRES_USER" -d "$POSTGRES_DB"
 }
 
 run_migrate_and_seed() {
@@ -391,7 +391,7 @@ run_zephyr() {
     chown postgres:postgres "$PGDATA/postgresql.conf" "$PGDATA/pg_hba.conf"
   fi
 
-  # Keep port in sync for existing data dirs (host PG may occupy 5786).
+  # Keep port in sync for existing data dirs (host PG may occupy 5990).
   if [[ -f "$PGDATA/postgresql.conf" ]]; then
     if grep -qE '^[[:space:]]*port[[:space:]]*=' "$PGDATA/postgresql.conf"; then
       sed -i -E "s/^[[:space:]]*port[[:space:]]*=.*/port = ${PGPORT}/" "$PGDATA/postgresql.conf"

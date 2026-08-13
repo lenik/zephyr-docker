@@ -37,11 +37,11 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-zephyr}
       POSTGRES_DB: ${POSTGRES_DB:-zephyr}
       POSTGRES_HOST: postgresql
-      PGPORT: "5786"
+      PGPORT: "5990"
       JWT_SECRET: ${JWT_SECRET:-change_me}
       PORT: ${BACKEND_HTTP_PORT:-8080}
       BACKEND_HTTP_PORT: ${BACKEND_HTTP_PORT:-8080}
-      DATABASE_URL: postgresql://${POSTGRES_USER:-zephyr}:${POSTGRES_PASSWORD:-zephyr}@postgresql:5786/${POSTGRES_DB:-zephyr}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-zephyr}:${POSTGRES_PASSWORD:-zephyr}@postgresql:5990/${POSTGRES_DB:-zephyr}
       ZEPHYR_DATA_DIR: /home/data/project/zephyr
       ZEPHYR_UPLOAD_DIR: /home/data/project/zephyr/upload
       ZEPHYR_CACHE_DIR: /home/data/project/zephyr/cache

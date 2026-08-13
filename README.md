@@ -31,9 +31,9 @@ make compose-medium # render medium compose (ZEPHYR_INSTANCE=../i-medium)
 
 | Service | In container | Host (bridge) |
 |---------|--------------|---------------|
-| backend | `8080` | `6786` |
-| web | `80` | `8786` |
-| mobile web | `8081` | `18786` |
+| backend | `8080` | `6990` |
+| web | `80` | `8990` |
+| mobile web | `8081` | `18990` |
 
 `i-local` `make up` calls `scripts/check-host-ports.sh` and exits if those host ports are already bound (skipped when container `zephyr` is already running).
 
