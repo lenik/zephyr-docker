@@ -1,0 +1,28 @@
+Source: zephyr-docker
+Section: devel
+Priority: optional
+Maintainer: Lenik <lenik@bodz.net>
+Build-Depends:
+ debhelper-compat (= 13),
+ meson (>= 0.60.0),
+ asciidoctor,
+ ninja-build
+Standards-Version: 4.6.2
+Rules-Requires-Root: no
+Homepage: https://github.com/lenik/zephyr-docker
+
+Package: zephyr-docker
+Architecture: all
+Depends: ${misc:Depends}, rsync, make, docker.io | docker-ce, bash
+Recommends: bash-completion
+Description: Docker image template and mkdockerimage helper for Node apps
+ zephyr-docker provides a reusable Docker build/runtime template for
+ applications shaped like zephyr (backend + web + prisma), plus the
+ mkdockerimage(1) tool that materializes the template into an app repo
+ and builds the image.
+ .
+ Placeholders (zephyr, 990/991) are replaced with the application name
+ and ports derived from backend PORT. Optional modules cover Playwright
+ e2e and mobile www.
+ .
+ Install bash-completion for programmable completion of mkdockerimage(1).

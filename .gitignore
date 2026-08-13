@@ -1,0 +1,11 @@
+obj-*/
+build/
+.build-ctx/
+debian/files
+debian/*.debhelper*
+debian/*.substvars
+debian/debhelper-build-stamp
+debian/zephyr-docker/
+docker/.build-ctx/
+docker/.build-ctx.prev/
+.vscode/

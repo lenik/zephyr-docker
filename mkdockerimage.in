@@ -1,6 +1,6 @@
 #!/bin/bash
-    : ${RCSID:=$Id: - 0.5.0 2026-08-13 14:00:00 - $}
-    : ${PROGRAM_TITLE:="Make docker image from DockerTempl"}
+    : ${RCSID:=$Id: - @VERSION@ 2026-08-13 16:00:00 - $}
+    : ${PROGRAM_TITLE:="Make docker image from zephyr-docker template"}
     : ${PROGRAM_SYNTAX:="[OPTIONS] [--] REPO"
                         "(REPO is the path to the application repository)"}
 
@@ -42,6 +42,28 @@ function setopt() {
     esac
 }
 
+function find_template_dir() {
+    local dir
+    if [ -n "${ZEPHYR_DOCKER_TEMPLATE:-}" ]; then
+        dir=$ZEPHYR_DOCKER_TEMPLATE
+        [ -d "$dir" ] || quit "ZEPHYR_DOCKER_TEMPLATE not a directory: $dir"
+        printf '%s\n' "$dir"
+        return 0
+    fi
+    # Dev tree: ./docker next to this script
+    if [ -d "$__DIR__/docker" ]; then
+        printf '%s\n' "$__DIR__/docker"
+        return 0
+    fi
+    # Installed: $prefix/share/zephyr-docker/docker
+    dir="@datadir@/zephyr-docker/docker"
+    if [ -d "$dir" ]; then
+        printf '%s\n' "$dir"
+        return 0
+    fi
+    quit "zephyr-docker template not found (set ZEPHYR_DOCKER_TEMPLATE or install zephyr-docker)"
+}
+
 function main() {
     local repo="$1"
     if [ -z "$repo" ]; then
@@ -73,9 +95,9 @@ function main() {
     port0=$((backend_port % 1000))
     port1=$((port0 + 1))
 
-    __FILE__=$( realpath "$0" )
+    __FILE__=$(realpath "$0")
     __DIR__=${__FILE__%/*}
-    templdir=${__DIR__}/docker
+    templdir=$(find_template_dir)
 
     forkdir=$(mktemp -d -t "docker-${projectname}.XXXXXX")
     cleanup() {
@@ -132,7 +154,6 @@ function main() {
     [ "$opt_force_build" -eq 1 ] && prepare_opts+=(-f)
 
     _log1 "make -C docker build PREPARE_OPTS='${prepare_opts[*]}'"
-    # ROOT=docker → default REPO=docker/.. is the app repo; pass explicitly anyway.
     make -C "$repodockerdir" build \
         REPO="$repodir" \
         PREPARE_OPTS="${prepare_opts[*]}"

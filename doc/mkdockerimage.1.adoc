@@ -1,0 +1,91 @@
+= mkdockerimage(1)
+:doctype: manpage
+:man source: zephyr-docker
+:man manual: zephyr-docker Manual
+:man version: 0.5.0
+
+== NAME
+
+mkdockerimage - materialize the zephyr-docker template into an app and build its image
+
+== SYNOPSIS
+
+*mkdockerimage* [OPTIONS] [--] _REPO_
+
+== DESCRIPTION
+
+*mkdockerimage* copies the *zephyr-docker* image template into _REPO_/docker/,
+substitutes placeholders (*zephyr* → application name, *990*/*991* → ports derived
+from the backend *PORT*), then runs `make -C docker build`.
+
+The template ships Node/Postgres/nginx all-in-one (and optional roles) build
+files under the installed data directory, or next to this script in a
+development checkout (`./docker`).
+
+== OPTIONS
+
+*-e, --e2e*::
+    Include the Playwright web-e2e module and Chromium in the image.
+
+*-m, --mobile*::
+    Include mobile static www in the image.
+
+*-f, --force-build*::
+    Force `pnpm -C web|backend build` even when dist/ looks up to date.
+
+*-k, --keep-temp*::
+    Keep the temporary substituted fork on failure (for debugging).
+
+*-q, --quiet*::
+    Decrease log verbosity.
+
+*-v, --verbose*::
+    Increase log verbosity.
+
+*-h, --help*::
+    Show help.
+
+*--version*::
+    Show version.
+
+== ARGUMENTS
+
+_REPO_::
+    Path to the application repository. Defaults to the current directory.
+    Must contain `backend/`, `web/`, and `prisma/`.
+
+== ENVIRONMENT
+
+*ZEPHYR_DOCKER_TEMPLATE*::
+    Override the template directory (normally `$prefix/share/zephyr-docker/docker`
+    or `./docker` in a source tree).
+
+*PREPARE_OPTS*::
+    Extra options forwarded via `make` (also set by *-e*/*-m*/*-f*).
+
+== FILES
+
+*$prefix/share/zephyr-docker/docker*::
+    Installed image template (Dockerfile, context.d/, source.d/, nginx/, …).
+
+*_REPO_/docker*::
+    Per-application materialized template and build context.
+
+*_REPO_/backend/.env*::
+    Read for `PORT=` to derive host port suffixes (*x990* → *PORT % 1000*).
+
+== EXAMPLES
+
+Build *mpss* with a lean image::
+    mkdockerimage /home/figma/mpss
+
+Include e2e and mobile modules::
+    mkdockerimage -e -m /home/figma/cicc
+
+== SEE ALSO
+
+*docker*(1), *make*(1)
+
+== AUTHOR
+
+zephyr-docker maintainers
