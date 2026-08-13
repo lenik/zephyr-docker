@@ -9,3 +9,5 @@ debian/zephyr-docker/
 docker/.build-ctx/
 docker/.build-ctx.prev/
 .vscode/
+*.gz
+
