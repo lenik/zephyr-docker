@@ -73,8 +73,10 @@ function main() {
     port0=$((backend_port % 1000))
     port1=$((port0 + 1))
 
-    __FILE__=$( readlink -f "$0" )
-    templdir=$(cd "$(dirname "$__FILE__")" && pwd)
+    __FILE__=$( realpath "$0" )
+    __DIR__=${__FILE__%/*}
+    templdir=${__DIR__}/docker
+
     forkdir=$(mktemp -d -t "docker-${projectname}.XXXXXX")
     cleanup() {
         if [ "$opt_keep_temp" -eq 1 ]; then
@@ -95,7 +97,6 @@ function main() {
         --exclude '.build-ctx/' \
         --exclude '.build-ctx.prev/' \
         --exclude 'vendor/' \
-        --exclude 'mkdockerimage' \
         "$templdir/" "$forkdir/"
 
     # Split literals so this script itself is not rewritten by repl.
